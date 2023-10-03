@@ -1,0 +1,316 @@
+---
+title: "Bayesian estimation of biological age"
+author: "David Pérez Ros"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
+```
+
+```{r data,warning=FALSE,message=FALSE}
+# install.packages("rstan")
+load(paste(getwd(),"/dat_con_Bioage.RData",sep = ''))
+library(rstan)
+rstan_options(auto_write = TRUE) # Para no recompilar los chunks no modificados se guardan en cache
+dat=dat.used
+rm(dat.used)
+```
+
+```{r}
+start_time <- Sys.time()
+```
+
+## The Bayesian model
+
+Sea $Y_{ij} \in \mathcal{Y}_j$ una caracteristica $j$ posiblemente relacionada con la edad para el individuo $i$. Definimos la **edad biológica Ba_i** como: $$Ba_i=c_i+\theta_i,$$
+
+donde
+
+-   $c_i$ es la edad cronóligica observada
+-   $\theta_i$ es la correción que hay que aportar a la edad cronólogica para obtener la edad biológica.
+
+Listado de características y tipo de variable
+
+| Name caracteristic          | Levels             | Nombre variable | model      |
+|------------------------|----------------|----------------|----------------|
+| sexo                        | 'M','F'            | y1              | bernoulli  |
+| comorbilidades              | '0','1','2 o mas'  | y2              | multilogit |
+| cuantas.horas.duerme-al.dia | 'in6','6-8','sup8' | y3              | multilogit |
+| tiene.stress                | 'y','n'            | y4              | bernoulli  |
+| bebe.alcohol.destilado      | 'y','n'            | y5              | bernoulli  |
+| bebe.alcohol.fermentado     | ''y','n'           | y6              | bernoulli  |
+| rs4994_count.A              | '0','1','2'        | y7              | multilogit |
+| rs4293558_count.C           | '0','1','2'        | y8              | multilogit |
+| rs10246939_count.C          | '0','1','2'        | y9              | multilogit |
+| IMC.fuera.normal            | 'y','n'            | y10             | bernoulli  |
+
+El modelo Bayesiano estimado es el siguiente:
+
+$$
+\begin{aligned}
+Y_{ij}|\mu_{ij} & \sim f_j(\mu_{ij},\sigma_j), \; \mu_{ij}=E(Y_{ij}), \; \sigma^2_j=VAR(Y_{ij})\\
+\mu_j | \beta_{0j},\beta_{1j} & = \beta_{0j}+\beta_{1j}Ba_i\\
+\beta_{0j} & \sim \pi(\beta_{0j}) \propto 1 \beta_{0j} \in \mathbb{R}\\
+\beta_{1j} & \sim \pi(\beta_{1j}) \propto 1 \beta_{1j} \in \mathbb{R}\\
+\theta_{i} & \sim \pi(\theta_i) = U(-15,15) \\
+\sigma^2_j & \sim \pi(\sigma^2_j) = Exp( \sigma_j)
+\end{aligned}
+$$
+
+Es decir, notar que:
+
+-   Si $Y_j \in \mathcal{Y}_j \subset \mathbb{R}$ entonces $f_j$ es el modelo normal de media $\mu_{ij}$ y varianza $\sigma^2_j$,
+-   si $\mathcal{Y}_j = \{0,1\}$ $f_j$ es el modelo Bernoulli cuyo logit de la probabilidad de éxito es $\mu_{ij}$.
+
+A través de MCMC vamos a buscar las distribuciones a posteriori para dichos parámetros (generaremos una muestra de 2000 observaciones de la distribución para cada individuo) y nos quedaremos con los 3 cuartiles de interés (0.05,0.5,0.95) para así poder dar un IC muy bueno de la biological age.
+
+## Estimatin
+
+```{r stan,eval=TRUE,warning=FALSE}
+#To avoid recompilation of unchanged Stan programs
+rstan_options(auto_write = TRUE)
+
+#Sys.setenv(LOCAL_CPPFLAGS = '-march=native -mtune=native')
+
+#run on parallel (several cores)
+options(mc.cores = parallel::detectCores()/2)
+```
+
+Notar que todas variables que hemos incluido son discretas, primero bernoullis y en el caso de las de 3 niveles MULTILOGIT
+
+```{r model,eval=TRUE}
+mod.stan.ejemplo ="
+data {
+  int<lower=0> n;// number of observations lo minimo puede ser 0
+  vector[n] age; // edad
+  int<lower=0,upper=1> y1[n]; // sexo
+  int<lower=1,upper=3> y2[n]; // comorbilidades, 3 clases
+  int<lower=1,upper=3> y3[n]; // cuantas.horas.duerme.al.dia, 3 clases
+  int<lower=0,upper=1> y4[n]; // tiene.stress, 2 clases
+  int<lower=0,upper=1> y5[n]; // bebe.alcohol.destilado, 2 clases
+  int<lower=0,upper=1> y6[n]; // bebe.alcohol.fermentado, 2 clases
+  int<lower=1,upper=3> y7[n]; // rs4994_count.A , 3 clases
+  int<lower=1,upper=3> y8[n]; // rs429358_count.C, 3 clases
+  int<lower=1,upper=3> y9[n]; // rs10246939_count.C, 3 clases
+  int<lower=0,upper=1> y10[n]; // IMC.fuera.normal, 3 clases
+  }
+
+parameters {
+  vector<lower=-15,upper=15>[n] bcorr;
+  real beta0_y1;
+  real beta1_y1;
+  real beta0_y4;
+  real beta1_y4;
+  real beta0_y5;
+  real beta1_y5;
+  real beta0_y6;
+  real beta1_y6;
+  real beta0_y10;
+  real beta1_y10;
+  
+  
+  
+
+  vector[2] beta1_y2_raw;
+  vector[2] beta1_y3_raw;
+  vector[2] beta1_y7_raw;
+  vector[2] beta1_y8_raw;
+  vector[2] beta1_y9_raw;
+
+}
+
+transformed parameters {
+  vector[n] bioage;
+  vector[3] beta1_y2;
+  vector[3] beta1_y3;
+  vector[3] beta1_y7;
+  vector[3] beta1_y8;
+  vector[3] beta1_y9;  
+  
+  beta1_y2 = append_row(0, beta1_y2_raw);
+  beta1_y3 = append_row(0, beta1_y3_raw); 
+  beta1_y7 = append_row(0, beta1_y7_raw); 
+  beta1_y8 = append_row(0, beta1_y8_raw); 
+  beta1_y9 = append_row(0, beta1_y9_raw); 
+  bioage=age+bcorr;
+
+}
+
+model {
+
+
+    beta0_y1  ~normal(0,9);
+    beta1_y1  ~normal(0,9);
+    beta0_y4  ~normal(0,9);
+    beta1_y4  ~normal(0,9);
+    beta0_y5  ~normal(0,9);
+    beta1_y5  ~normal(0,9);
+    beta0_y6  ~normal(0,9);
+    beta1_y6  ~normal(0,9);
+    beta0_y10  ~normal(0,9);
+    beta1_y10  ~normal(0,9);
+  
+   y1 ~ bernoulli_logit(beta0_y1 +beta1_y1*(age+bcorr));
+   y4 ~ bernoulli_logit(beta0_y4 +beta1_y4*(age+bcorr));
+   y5 ~ bernoulli_logit(beta0_y5 +beta1_y5*(age+bcorr));
+   y6 ~ bernoulli_logit(beta0_y6 +beta1_y6*(age+bcorr));
+  y10 ~ bernoulli_logit(beta0_y10 +beta1_y10*(age+bcorr));  
+  
+  
+  
+  
+  beta1_y2_raw~ normal(0, 9);
+  beta1_y3_raw~ normal(0, 9);
+  beta1_y7_raw~ normal(0, 10);
+  beta1_y8_raw~ normal(0, 9);
+  beta1_y9_raw~ normal(0, 9);  
+
+  
+  for (i in 1:n) {
+    y2[i] ~ categorical_logit(beta1_y2*(age[i]+bcorr[i]));
+    y3[i] ~ categorical_logit(beta1_y3*(age[i]+bcorr[i]));
+    y7[i] ~ categorical_logit(beta1_y7*(age[i]+bcorr[i]));
+    y8[i] ~ categorical_logit(beta1_y8*(age[i]+bcorr[i]));
+    y9[i] ~ categorical_logit(beta1_y9*(age[i]+bcorr[i]));
+    
+
+    }
+}
+"
+```
+
+Último MCMC para fijar los valores iniciales
+
+```{r n_chains,eval=TRUE}
+mod.imp <- stan_model(model_code = mod.stan.ejemplo)
+#cadenas y numero de iteraciones
+nchains=6
+niter=2000
+
+```
+
+
+Las variables efectivamente utilizadas en el modelo. Creamos una lista con las que vamos a usar:
+
+```{r load_data,eval=TRUE}
+
+
+n=nrow(dat)
+dd=list(n=785,age=dat$edad,
+                    y1=as.numeric(dat$sexo=='M'),
+                    y4=as.numeric(dat$tiene.stress=='y'),
+                    y5=as.numeric(dat$bebe.alcohol.destilado=='y'),
+                    y6=as.numeric(dat$bebe.alcohol.fermentado=='y'),
+                    y10=as.numeric(dat$IMC.fuera.normal=='y'),        
+                    y2=as.numeric(ifelse(dat$comorbilidades=='0',1,ifelse(dat$comorbilidades=='1',2,3))),
+                    y3=as.numeric(ifelse(dat$cuantas.horas.duerme.al.dia=='inf6',1,ifelse(dat$cuantas.horas.duerme.al.dia=='6-8',2,3))),
+                     y7=as.numeric(ifelse(dat$rs4994_count.A=='0',1,ifelse(dat$rs4994_count.A=='1',2,3))),
+                    y8=as.numeric(ifelse(dat$rs429358_count.C=='0',1,ifelse(dat$rs429358_count.C=='1',2,3))),
+                    y9=as.numeric(ifelse(dat$rs10246939_count.C=='0',1,ifelse(dat$rs10246939_count.C=='1',2,3)))
+             
+        )
+names(dd)
+```
+
+```{r run_model,eval=TRUE}
+
+#no especificamos warmup entonces quiteamos la mitad deiteraciones 4000/2=2000
+#thin=100 nos dice que se quede una de cada 100 iteraciones es decir 2000/100=200 por observacion
+fit = sampling(mod.imp, 
+               data=dd,
+           iter=niter,seed = 11,
+           refresh=10,thin = 3,cores=2,
+    #       init = init_f(),
+           control = list(adapt_delta = 0.99,max_treedepth=50),
+          chains = nchains)
+
+nfile="pruebaconceroc.RData"
+end_time <- Sys.time()
+
+
+nfile<-"pruebaconcerob_25_08_2023.RData"
+save(fit,file=nfile)
+
+
+# to save at what time the program ended
+timee<-data.frame(c(start_time,end_time))
+save(timee,file="tiempo_25_08_2023.RData")
+
+
+```
+
+
+
+HA ESTADO 10 horas y 43 minutos compilando casi me tirooo por un puente. encima no se han mixeado.
+
+
+```{r plot1,eval=TRUE,echo=FALSE,include=FALSE}
+
+nfile="pruebaconceroc.RData"
+load(nfile)
+bcorr=extract(fit,pars="bcorr")$bcorr
+ic=round(apply(bcorr,2,quantile,p=c(0.025,0.5,0.975)),1)
+mas.viejos=which(ic[1,]>0)
+mas.joven=which(ic[3,]<0)
+dat$bioage=dat$edad+ic[2,]
+dat$bioage.inf=dat$edad+ic[1,]
+dat$bioage.sup=dat$edad+ic[3,]
+yl=range(dat[c("bioage", "bioage.inf", "bioage.sup")])
+par(mfrow=c(1,1))
+n=785
+plot(1:n,dat$edad.biologica,pch=19,col=1,ylim=yl)
+segments(1:n,dat$bioage.inf,1:n,dat$bioage.sup,col=2)
+points(1:n,dat$bioage,col=2)
+points(1:n,dat$edad,col=3)
+legend("bottom",col=1:3,pch=19,c("Predicted years ago","Estimated",'Real age'))
+```
+
+Here we show the firs 30 observations
+```{r plot2,out.width = "40%"}
+ plot(1:30,dat$edad.biologica[1:30],pch=19,col=1,ylim=yl)
+segments(1:30,dat$bioage.inf[1:30],1:30,dat$bioage.sup[1:30],col=2)
+ points(1:30,dat$bioage[1:30],col=2)
+points(1:30,dat$edad[1:30],col=3)
+legend("bottom",col=1:3,pch=19,c("Predicted years ago","Estimated",'Real age'))
+
+
+```
+
+Here the histogram for the biological age range (we see it's too big in most cases)
+```{r,out.width = "40%"}
+li=(dat$bioage.sup-dat$bioage.inf)
+hist(li)
+
+
+
+```
+
+Plot of the coefficients B1
+```{r plot_beta1_y,out.width = "30%",warning=FALSE,message=FALSE}
+#Betas_0 and betas_1 for the bernoullis
+plot(fit,par=paste("beta0_y",c(1,4,5,6,10),sep=""))
+plot(fit,par=paste("beta1_y",c(1,4,5,6,10),sep=""))
+
+
+
+#beta_1 for the multilogits (it has dimension 3=nº of outcomes (being the firs coefficient 0))
+ plot(fit,par=paste("beta1_y",c(2,3,7,8,9),"[1]",sep=""))
+
+ #second intercept for the multilogits
+ plot(fit,par=paste("beta1_y",c(2,3,7,8,9),"[2]",sep=""))
+
+ #third intercept for the multilogits
+ plot(fit,par=paste("beta1_y",c(2,3,7,8,9),"[3]",sep=""))
+
+
+```
+
+Now let's explore with the shiny stan the convergence and mixture of the chains. Everythings seems to be right.
+
+```{r,eval=FALSE}
+library(shinystan)
+shinystan::launch_shinystan(fit)
+```
+
