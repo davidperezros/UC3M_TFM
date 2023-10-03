@@ -305,6 +305,7 @@ plot(fit,par=paste("beta1_y",c(1,4,5,6,10),sep=""))
  plot(fit,par=paste("beta1_y",c(2,3,7,8,9),"[3]",sep=""))
 
 
+ 
 ```
 
 Now let's explore with the shiny stan the convergence and mixture of the chains. Everythings seems to be right.
