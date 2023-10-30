@@ -106,7 +106,7 @@ model {
 
 Último MCMC para fijar los valores iniciales
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 mod.imp <- stan_model(model_code = mod.stan.ejemplo)
 nchains=10
 niter=40000
@@ -121,10 +121,15 @@ pp$bcorr=NULL
 ii=c(ii,lapply(pp, mean))
 ll=list(ii)
 save(ll,file="example-initchain.RData")
+
+```
+
+```{r}
 load(file="example-initchain.RData")
 for(i in 1:(nchains-1)) ll=c(ll,list(ii))
 init_f <- function () ll
 ```
+
 
 Las variables efectivamente utilizadas en el modelo:
 
@@ -184,7 +189,57 @@ yl=range(dat[c("bioage", "true.bioage", "true.bcorr", "bioage.inf", "bioage.sup"
 plot(1:n,dat$true.bioage,pch=19,col=1,ylim=yl)
 segments(1:n,dat$bioage.inf,1:n,dat$bioage.sup,col=2)
 points(1:n,dat$bioage,col=2)
+
 legend("bottom",col=1:2,pch=19:20,c("True","Estimated"))
+
+
+# resumen de los intervalos
+summary(abs(dat$bioage.inf-dat$bioage.sup))
 ```
 
+
+
+
+
+Convergencia Gelman-Rubin Statistic (R-hat): El estadístico de Gelman-Rubin es una medida de convergencia entre las cadenas. Puedes acceder a él de la siguiente manera:Si todos los valores de Rhat son cercanos a 1, esto indica convergencia adecuada.
+```{r}
+# Supongamos que 'fit' es tu objeto stanfit
+summary_result <- summary(fit)
+rhat_statistic <- summary_result$summary[, "Rhat"]
+
+```
+
+
+
+Divergences: Si hubo divergencias durante el muestreo, también se registrarán en el resumen. Puedes acceder a las divergencias de esta manera:
+```{r}
+#divergences <- summary_result$summary[, "divergent__"]
+
+```
+
+
+
+
+```{r}
+library(shinystan)
+launch_shinystan(fit)
+```
+
+
+```{r}
+
+traceplot_params<-traceplot(fit,pars=c("beta0_y1","beta1_y1","sigma_y1","beta0_y2","beta1_y2"))
+ggsave(traceplot_params, 
+        filename = "Plots/traceplot_params.jpeg",
+        device = "jpeg",
+        height = 6, width = 10, units = "in")
+
+
+
+traceplot_bioage<-traceplot(fit,pars=c("bioage"))
+ggsave(traceplot_bioage, 
+        filename = "Plots/traceplot_bioage.jpeg",
+        device = "jpeg",
+        height = 4, width = 10, units = "in")
+```
 
