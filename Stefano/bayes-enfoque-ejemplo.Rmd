@@ -219,6 +219,32 @@ Divergences: Si hubo divergencias durante el muestreo, también se registrarán 
 
 
 
+```{r}
+li=(dat$bioage.sup-dat$bioage.inf)
+hist(li)
+library(ggplot2)
+# Create the ggplot2 histogram
+# Create the ggplot2 histogram with a light theme
+hist_bioage_example<-ggplot(dat, aes(x = li)) +
+  geom_histogram(fill = "bisque", color = "orange", bins = 6) +
+  labs(
+    title = "Histogram for BO uncertainty",
+    x = "Difference",
+    y = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(panel.background = element_rect(fill = "transparent"))
+
+
+ggsave(hist_bioage_example, 
+        filename = "Plots_Theoretical_Example/hist_bioage_example.jpeg",
+        device = "jpeg",
+        height = 5, width = 7, units = "in")
+
+
+```
+
+
 
 ```{r}
 library(shinystan)
