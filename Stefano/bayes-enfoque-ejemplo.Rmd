@@ -265,7 +265,7 @@ launch_shinystan(fit)
 ```{r}
 
 traceplot_params<-
-traceplot(fit,pars=c("beta0_y1","beta1_y1","sigma_y1","beta0_y2","beta1_y2"),ncol=5)+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15))
+traceplot(fit,pars=c("beta0_y1","beta1_y1","sigma_y1","beta0_y2","beta1_y2"),ncol=5)+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15),strip.text = element_text(size = 20))
 
 #Pegar en la consola 
 ggsave(traceplot_params, 
@@ -275,7 +275,7 @@ ggsave(traceplot_params,
 
 
 
-traceplot_bioage<-traceplot(fit,pars=c("bioage"),ncol=5)+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15))
+traceplot_bioage<-traceplot(fit,pars=c("bioage"),ncol=5)+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15),strip.text = element_text(size = 20))
 
 #Pegar en la consola 
 ggsave(traceplot_bioage, 
