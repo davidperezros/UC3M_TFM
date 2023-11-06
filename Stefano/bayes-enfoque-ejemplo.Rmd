@@ -223,9 +223,12 @@ Divergences: Si hubo divergencias durante el muestreo, también se registrarán 
 li=(dat$bioage.sup-dat$bioage.inf)
 hist(li)
 library(ggplot2)
-# Create the ggplot2 histogram
-# Create the ggplot2 histogram with a light theme
-hist_bioage_example<-ggplot(dat, aes(x = li)) +
+
+
+
+
+# Create the ggplot2 histogram with a light theme and larger text size
+hist_bioage_example<- ggplot(dat, aes(x = li)) +
   geom_histogram(fill = "bisque", color = "orange", bins = 6) +
   labs(
     title = "Histogram for BO uncertainty",
@@ -233,7 +236,14 @@ hist_bioage_example<-ggplot(dat, aes(x = li)) +
     y = "Frequency"
   ) +
   theme_minimal() +
-  theme(panel.background = element_rect(fill = "transparent"))
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 12),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 12),    # Adjust y-axis text size
+    axis.title = element_text(size = 14)      # Adjust title size
+  )
+
+
 
 
 ggsave(hist_bioage_example, 
@@ -312,10 +322,44 @@ ggsave(plot2,
 
 ```{r}
 #Betas_0 and betas_1 for the bernoullis
-p1<-plot(fit,par=c("beta0_y1","beta1_y1","sigma_y1"))
-p2<-plot(fit,par=c("beta0_y2"))
-p3<-plot(fit,par=c("beta1_y2"))
-p4<-plot(fit,par=c("bioage"))
+p1<-plot(fit,par=c("beta0_y1","beta1_y1","sigma_y1"))+
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 20),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 20),    # Adjust y-axis text size
+    axis.title = element_text(size = 20),      # Adjust title size,
+    axis.title.x = element_blank(),  # Hide x-axis title
+  axis.title.y = element_blank()   # Hide y-axis title
+  )
+
+
+p2<-plot(fit,par=c("beta0_y2"))+
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 20),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 20),    # Adjust y-axis text size
+    axis.title = element_text(size = 16),      # Adjust title size,
+    axis.title.x = element_blank(),  # Hide x-axis title
+  axis.title.y = element_blank()   # Hide y-axis title
+  )
+p3<-plot(fit,par=c("beta1_y2"))+
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 20),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 20),    # Adjust y-axis text size
+    axis.title = element_text(size = 16),      # Adjust title size,
+    axis.title.x = element_blank(),  # Hide x-axis title
+  axis.title.y = element_blank()   # Hide y-axis title
+  )
+p4<-plot(fit,par=c("bioage"))+
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 20),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 20),    # Adjust y-axis text size
+    axis.title = element_text(size = 16),      # Adjust title size,
+    axis.title.x = element_blank(),  # Hide x-axis title
+  axis.title.y = element_blank()   # Hide y-axis title
+  )
 
 
 ggsave(p1, 

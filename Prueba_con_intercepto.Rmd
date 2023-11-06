@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
 ```{r data,warning=FALSE,message=FALSE}
 
 # install.packages("rstan")
-load(paste(getwd(),"/dat_con_Bioage.RData",sep = ''))
+load(paste(getwd(),"/dat_con_Bioage .RData",sep = ''))
 library(rstan)
 rstan_options(auto_write = TRUE) # Para no recompilar los chunks no modificados se guardan en cache
 dat=dat.used
@@ -273,7 +273,9 @@ HA ESTADO 10 horas y 43 minutos compilando casi me tirooo por un puente. encima 
 
 ```{r plot1,eval=TRUE,echo=FALSE,include=FALSE}
 
-nfile="pruebaconceroc.RData"
+nfile<-"pruebaconintercepto_25_08_2023.RData"
+
+#pruebaconcerob_25_08_2023.RData
 load(nfile)
 bcorr=extract(fit,pars="bcorr")$bcorr
 ic=round(apply(bcorr,2,quantile,p=c(0.025,0.5,0.975)),1)
@@ -308,7 +310,30 @@ Here the histogram for the biological age range (we see it's too big in most cas
 
 ```{r,out.width = "40%"}
 li=(dat$bioage.sup-dat$bioage.inf)
-hist(li)
+#hist(li)
+
+
+
+
+library(ggplot2)
+# Create the ggplot2 histogram
+# Create the ggplot2 histogram with a light theme
+hist_bioage_example<-ggplot(dat, aes(x = li)) +
+  geom_histogram(fill = "bisque", color = "orange", bins = 6) +
+  labs(
+    title = "Histogram for BO uncertainty",
+    x = "Difference",
+    y = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(panel.background = element_rect(fill = "transparent"))
+
+
+ggsave(hist_bioage_example, 
+        filename = "Simulation/hist_bioage.jpeg",
+        device = "jpeg",
+        height = 5, width = 7, units = "in")
+
 
 
 
@@ -326,12 +351,15 @@ plot(fit,par=paste("beta1_y",c(1,4,5,6,10),sep=""))
 #beta_1 for the multilogits (it has dimension 3=nº of outcomes (being the firs coefficient 0))
  plot(fit,par=paste("beta1_y",c(2,3,7,8,9),"[1]",sep=""))
 
- #second intercept for the multilogits
+ #second  for the multilogits
  plot(fit,par=paste("beta1_y",c(2,3,7,8,9),"[2]",sep=""))
 
- #third intercept for the multilogits
+ #third  for the multilogits
  plot(fit,par=paste("beta1_y",c(2,3,7,8,9),"[3]",sep=""))
 
+ 
+ #beta_0 for the multilogits 
+ plot(fit,par=paste("beta0_y",c(2,3,7,8,9),sep=""))
 
 ```
 
