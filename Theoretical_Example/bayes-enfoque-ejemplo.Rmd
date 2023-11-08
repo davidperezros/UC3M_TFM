@@ -1,0 +1,384 @@
+---
+title: "Bayesian estimation of biological age"
+author: "--"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
+```
+
+Suppose to simulate two phenotypes based on biological ages. These phenotypes can be of dirrent nature, i.e. continuous or categorical.
+
+```{r data}
+set.seed(17)
+n=10
+bioage.corr=runif(n,-10,10)
+age=runif(n,20,60)
+bioage=age+bioage.corr
+y1=10+5*bioage+rnorm(n,sd=2)
+y2=rbinom(n,size=1,prob=exp(0.01*bioage)/(1+exp(0.01*bioage)))
+dat=data.frame(y1,y2=factor(y2),age)
+```
+
+These are our data, the biological age used for simulation is unknown.
+
+```{r}
+plot(dat$age,dat$y1)
+boxplot(dat$age~dat$y2)
+```
+
+
+## The Bayesian model
+
+Sea $Y_{ij} \in \mathcal{Y}_j$ una caracteristica posiblemente relacionada con la edad para el individuo $i$. Definimos la edad biológica como:
+$$Ba_i=c_i+\theta_i,$$
+
+donde $c_i$ es la edad cronóligica observada y $\theta_i$ es la correción que hay que aportar a la edad cronólogica para obtener la edad biológica.
+
+El modelo Bayesiano estimado es el siguiente:
+
+$$
+\begin{aligned}
+Y_{ij}|\mu_{ij} & \sim f_j(\mu_{ij},\sigma_j), \; \mu_{ij}=E(Y_{ij}), \; \sigma^2_j=VAR(Y_{ij})\\
+\mu_j | \beta_{0j},\beta_{1j} & = \beta_{0j}+\beta_{1j}Ba_i\\
+\beta_{0j} & \sim \pi(\beta_{0j}) \propto 1 \beta_{0j} \in \mathbb{R}\\
+\beta_{1j} & \sim \pi(\beta_{1j}) \propto 1 \beta_{1j} \in \mathbb{R}\\
+\theta_{i} & \sim \pi(\theta_i) = U(-15,15) \\
+\sigma^2_j & \sim \pi(\sigma^2_j) \propto 1 \sigma_j\in\mathbb{R^+}
+\end{aligned}
+$$
+
+Si 
+
+- Si $Y_j \in \mathcal{Y}_j \subset \mathbb{R}$ entonces $f_j$ es el modelo normal de media $\mu_{ij}$ y varianza $\sigma^2_j$,
+
+mientras que 
+
+- si $\mathcal{Y}_j = \{0,1\}$ $f_j$ es el modelo Bernoulli cuyo logit de la probabilidad de éxito es $\mu_{ij}$.
+
+
+
+## Estimatin
+
+```{r}
+# install.packages("rstan")
+library(rstan)
+rstan_options(auto_write = TRUE)
+#Sys.setenv(LOCAL_CPPFLAGS = '-march=native -mtune=native')
+options(mc.cores = parallel::detectCores())
+```
+
+Este es el modelo implementado en STAN
+
+```{r}
+mod.stan.ejemplo ="
+data {
+  int<lower=0> n;// number of observations
+  vector[n] age; // edad
+  vector[n] y1; // imc
+  int<lower=0,upper=1> y2[n]; // hipertension
+}
+
+parameters {
+  vector<lower=-15,upper=15>[n] bcorr;
+  real beta0_y1;
+  real beta1_y1;
+  real<lower=0> sigma_y1;
+  real beta0_y2;
+  real beta1_y2;
+}
+
+transformed parameters {
+  vector[n] bioage;
+  bioage=age+bcorr;
+}
+
+model {
+//   bcorr ~ normal(0,3); // Informative prior
+   y1 ~ normal_lpdf(beta0_y1 + beta1_y1 * (age+bcorr),sigma_y1);
+   y2 ~ bernoulli_logit(beta0_y2 +beta1_y2*(age+bcorr));
+}
+"
+```
+
+
+Último MCMC para fijar los valores iniciales
+
+```{r,eval=TRUE}
+mod.imp <- stan_model(model_code = mod.stan.ejemplo)
+nchains=10
+niter=40000
+nfile="example-bfit.RData"
+load(nfile)
+pp=extract(fit)
+pp$lp__=NULL
+pp$bioage=NULL
+ii=apply(pp$bcorr,2,mean)
+ii=list(bcorr=ii)
+pp$bcorr=NULL
+ii=c(ii,lapply(pp, mean))
+ll=list(ii)
+save(ll,file="example-initchain.RData")
+
+```
+
+```{r}
+load(file="example-initchain.RData")
+for(i in 1:(nchains-1)) ll=c(ll,list(ii))
+init_f <- function () ll
+```
+
+
+Las variables efectivamente utilizadas en el modelo:
+
+```{r}
+n=nrow(dat)
+dd=list(n=n,age=dat$age,
+                     y1=dat$y1,
+                     y2=as.numeric(dat$y2==1))
+names(dd)
+```
+
+
+
+```{r,eval=FALSE}
+fit = sampling(mod.imp, 
+               data=dd,
+           iter=niter,seed = 11,
+           refresh=1000,thin = 100,
+    #       init = init_f(),
+   #        control = list(adapt_delta = 0.99,max_treedepth=50),
+          chains = nchains)
+save(fit,file=nfile)
+```
+
+el Rhat:
+
+```{r}
+nfile="example-bfit.RData"
+load(nfile)
+fit.summary=summary(fit)
+summary(fit.summary$summary[,10])
+```
+
+
+
+La distribución a posteriori de las correciones para las edades biológicas con respecto a la edad cronólogica. Consideramos aquellas correciones con almenos el 50% de probabilidad:
+
+```{r}
+bcorr=extract(fit,pars="bcorr")$bcorr
+ic=round(apply(bcorr,2,quantile,p=c(0.05,0.5,0.95)),1)
+mas.viejos=which(ic[1,]>0)
+mas.joven=which(ic[3,]<0)
+dat$bioage=dat$age+ic[2,]
+dat$bioage.inf=dat$age+ic[1,]
+dat$bioage.sup=dat$age+ic[3,]
+dat$true.bioage=bioage
+dat$true.bcorr=bioage.corr
+```
+
+
+## Resultados
+
+These are the true and estiamted bioages:
+
+```{r}
+yl=range(dat[c("bioage", "true.bioage", "true.bcorr", "bioage.inf", "bioage.sup")])
+plot(1:n,dat$true.bioage,pch=19,col=1,ylim=yl)
+segments(1:n,dat$bioage.inf,1:n,dat$bioage.sup,col=2)
+points(1:n,dat$bioage,col=2)
+
+legend("bottom",col=1:2,pch=19:20,c("True","Estimated"))
+
+
+# resumen de los intervalos
+summary(abs(dat$bioage.inf-dat$bioage.sup))
+```
+
+
+
+
+
+Convergencia Gelman-Rubin Statistic (R-hat): El estadístico de Gelman-Rubin es una medida de convergencia entre las cadenas. Puedes acceder a él de la siguiente manera:Si todos los valores de Rhat son cercanos a 1, esto indica convergencia adecuada.
+```{r}
+# Supongamos que 'fit' es tu objeto stanfit
+summary_result <- summary(fit)
+rhat_statistic <- summary_result$summary[, "Rhat"]
+
+```
+
+
+
+Divergences: Si hubo divergencias durante el muestreo, también se registrarán en el resumen. Puedes acceder a las divergencias de esta manera:
+```{r}
+#divergences <- summary_result$summary[, "divergent__"]
+
+```
+
+
+
+```{r}
+li=(dat$bioage.sup-dat$bioage.inf)
+hist(li)
+library(ggplot2)
+
+
+
+
+# Create the ggplot2 histogram with a light theme and larger text size
+hist_bioage_example<- ggplot(dat, aes(x = li)) +
+  geom_histogram(fill = "bisque", color = "orange", bins = 6) +
+  labs(
+    title = "Histogram for BO uncertainty",
+    x = "Difference",
+    y = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 12),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 12),    # Adjust y-axis text size
+    axis.title = element_text(size = 14)      # Adjust title size
+  )
+
+
+
+
+ggsave(hist_bioage_example, 
+        filename = "Plots_Theoretical_Example/hist_bioage_example.jpeg",
+        device = "jpeg",
+        height = 5, width = 7, units = "in")
+
+
+```
+
+
+
+```{r}
+library(shinystan)
+launch_shinystan(fit)
+```
+
+
+```{r}
+
+traceplot_params<-
+traceplot(fit,pars=c("beta0_y1","beta1_y1","sigma_y1","beta0_y2","beta1_y2"),ncol=5)+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15),strip.text = element_text(size = 20))
+
+#Pegar en la consola 
+ggsave(traceplot_params, 
+        filename = "Plots_Theoretical_Example/traceplot_params.jpeg",
+        device = "jpeg",
+        height = 5, width = 18, units = "in")
+
+
+
+traceplot_bioage<-traceplot(fit,pars=c("bioage"),ncol=5)+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15),strip.text = element_text(size = 20))
+
+#Pegar en la consola 
+ggsave(traceplot_bioage, 
+        filename = "Plots_Theoretical_Example/traceplot_bioage.jpeg",
+        device = "jpeg",
+        height = 5, width = 18, units = "in")
+
+
+
+
+```
+
+
+```{r}
+#Cargamos los gráficos de acf (autocovriance plots)
+load("/Users/davpero/UC3M_TFM/Plots_Theoretical_Example/shinystan-autocorr-gg_bioaages.RData")
+shinystan_autocorr_gg_bioaages<- shinystan_autocorr_gg
+
+
+load("/Users/davpero/UC3M_TFM/Plots_Theoretical_Example/shinystan-autocorr-gg_hyperparams.RData")
+shinystan_autocorr_shinystan_autocorr_gg_hyperparams<- shinystan_autocorr_gg
+
+
+plot1<- shinystan_autocorr_gg_bioaages+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15))
+
+plot2<- shinystan_autocorr_shinystan_autocorr_gg_hyperparams+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15))
+
+#Pegar en la consola 
+ggsave(plot1, 
+        filename = "Plots_Theoretical_Example/acf_bioage.jpeg",
+        device = "jpeg",
+        height = 9, width = 18, units = "in")
+
+ggsave(plot2, 
+        filename = "Plots_Theoretical_Example/acf_params.jpeg",
+        device = "jpeg",
+        height = 5, width = 18, units = "in")
+
+```
+
+
+
+
+
+```{r}
+#Betas_0 and betas_1 for the bernoullis
+p1<-plot(fit,par=c("beta0_y1","beta1_y1","sigma_y1"))+
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 20),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 20),    # Adjust y-axis text size
+    axis.title = element_text(size = 20),      # Adjust title size,
+    axis.title.x = element_blank(),  # Hide x-axis title
+  axis.title.y = element_blank()   # Hide y-axis title
+  )
+
+
+p2<-plot(fit,par=c("beta0_y2"))+
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 20),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 20),    # Adjust y-axis text size
+    axis.title = element_text(size = 16),      # Adjust title size,
+    axis.title.x = element_blank(),  # Hide x-axis title
+  axis.title.y = element_blank()   # Hide y-axis title
+  )
+p3<-plot(fit,par=c("beta1_y2"))+
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 20),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 20),    # Adjust y-axis text size
+    axis.title = element_text(size = 16),      # Adjust title size,
+    axis.title.x = element_blank(),  # Hide x-axis title
+  axis.title.y = element_blank()   # Hide y-axis title
+  )
+p4<-plot(fit,par=c("bioage"))+
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 20),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 20),    # Adjust y-axis text size
+    axis.title = element_text(size = 16),      # Adjust title size,
+    axis.title.x = element_blank(),  # Hide x-axis title
+  axis.title.y = element_blank()   # Hide y-axis title
+  )
+
+
+ggsave(p1, 
+        filename = "Plots_Theoretical_Example/p1.jpeg",
+        device = "jpeg",
+        height = 6, width = 9, units = "in")
+
+ggsave(p2, 
+        filename = "Plots_Theoretical_Example/p2.jpeg",
+        device = "jpeg",
+        height = 6, width = 9, units = "in")
+ggsave(p3, 
+        filename = "Plots_Theoretical_Example/p3.jpeg",
+        device = "jpeg",
+        height = 6, width = 9, units = "in")
+ggsave(p4, 
+        filename = "Plots_Theoretical_Example/p4.jpeg",
+        device = "jpeg",
+        height = 6, width = 9, units = "in")
+
+```
+
