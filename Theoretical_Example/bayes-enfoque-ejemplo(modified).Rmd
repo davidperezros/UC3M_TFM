@@ -17,7 +17,7 @@ n=10
 bioage.corr=runif(n,-10,10)
 age=runif(n,20,60)
 bioage=age+bioage.corr
-y1=10+50*bioage+rnorm(n,sd=2)
+y1=10+500*bioage+rnorm(n,sd=2)
 y2=rbinom(n,size=1,prob=exp(0.01*bioage)/(1+exp(0.01*bioage)))
 dat=data.frame(y1,y2=factor(y2),age)
 ```
@@ -108,9 +108,8 @@ model {
 
 ```{r,eval=TRUE}
 mod.imp <- stan_model(model_code = mod.stan.ejemplo)
-nchains=10
-niter=40000
-nfile="example-bfit.RData"
+nchains=4
+niter=80000
 load(nfile)
 pp=extract(fit)
 pp$lp__=NULL
@@ -120,12 +119,12 @@ ii=list(bcorr=ii)
 pp$bcorr=NULL
 ii=c(ii,lapply(pp, mean))
 ll=list(ii)
-save(ll,file="example-initchain.RData")
+save(ll,file="example-initchain(modified).RData")
 
 ```
 
 ```{r}
-load(file="example-initchain.RData")
+load(file="example-initchain(modified).RData")
 for(i in 1:(nchains-1)) ll=c(ll,list(ii))
 init_f <- function () ll
 ```
@@ -143,13 +142,13 @@ names(dd)
 
 
 
-```{r,eval=FALSE}
+```{r}
 fit = sampling(mod.imp, 
                data=dd,
            iter=niter,seed = 11,
-           refresh=1000,thin = 100,
+           refresh=400,thin = 100,
            init = init_f(),
-          # control = list(adapt_delta = 0.99,max_treedepth=50),
+          control = list(adapt_delta = 0.99,max_treedepth=50),
           chains = nchains)
 save(fit,file=nfile)
 ```
@@ -157,7 +156,7 @@ save(fit,file=nfile)
 el Rhat:
 
 ```{r}
-nfile="example-bfit.RData"
+nfile="example-bfit(modified).RData"
 load(nfile)
 fit.summary=summary(fit)
 summary(fit.summary$summary[,10])
@@ -195,6 +194,9 @@ legend("bottom",col=1:2,pch=19:20,c("True","Estimated"))
 
 # resumen de los intervalos
 summary(abs(dat$bioage.inf-dat$bioage.sup))
+
+ plot(fit,par=c("beta1_y1","bioage"))
+
 ```
 
 
