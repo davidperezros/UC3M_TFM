@@ -243,7 +243,7 @@ dd=list(n=785,age=dat$edad,
 names(dd)
 ```
 
-```{r run_model,eval=TRUE}
+```{r run_model,eval=FALSE}
 
 #no especificamos warmup entonces quiteamos la mitad deiteraciones 4000/2=2000
 #thin=100 nos dice que se quede una de cada 100 iteraciones es decir 2000/100=200 por observacion
@@ -310,34 +310,182 @@ Here the histogram for the biological age range (we see it's too big in most cas
 
 ```{r,out.width = "40%"}
 li=(dat$bioage.sup-dat$bioage.inf)
-#hist(li)
-
-
-
-
 library(ggplot2)
-# Create the ggplot2 histogram
-# Create the ggplot2 histogram with a light theme
-hist_bioage_example<-ggplot(dat, aes(x = li)) +
-  geom_histogram(fill = "bisque", color = "orange", bins = 6) +
+
+
+
+
+# Create the ggplot2 histogram with a light theme and larger text size
+hist_bioage_example95<- ggplot(dat, aes(x = li)) +
+  geom_histogram(fill = "bisque", color = "orange", bins = 9)+
+  scale_x_continuous(breaks = seq(0, 31, 1)) +
+  scale_y_continuous(breaks = seq(0, 600, 100)) +
   labs(
-    title = "Histogram for BO uncertainty",
-    x = "Difference",
+    title = "Histogram for BO uncertainty at 95% level",
+    x = "Uncertainty",
     y = "Frequency"
-  ) +
+  )+
   theme_minimal() +
-  theme(panel.background = element_rect(fill = "transparent"))
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 12),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 12),    # Adjust y-axis text size
+    axis.title = element_text(size = 14)      # Adjust title size
+  )
 
 
-ggsave(hist_bioage_example, 
-        filename = "Simulation/hist_bioage.jpeg",
+
+
+ggsave(hist_bioage_example95, 
+        filename = "Plots_Simulation/hist_bioage95.jpeg",
         device = "jpeg",
         height = 5, width = 7, units = "in")
 
 
 
 
+
 ```
+```{r}
+hist(li)
+```
+
+
+
+
+
+```{r}
+# Al 80% ahora
+ic2=round(apply(bcorr,2,quantile,p=c(0.1,0.5,0.9)),1)
+
+mas.viejos2=which(ic2[1,]>0)
+mas.joven2=which(ic2[3,]<0)
+bioage2=dat$edad+ic2[2,]
+bioage.inf2=dat$edad+ic2[1,]
+bioage.sup2=dat$edad+ic2[3,]
+
+li2=(bioage.sup2-bioage.inf2)
+
+
+hist(li2)
+
+
+hist_bioage_example80<- ggplot(dat, aes(x = li2)) +
+  geom_histogram(fill = "bisque", color = "orange", bins = 9)+
+  scale_x_continuous(breaks = seq(0, 31, 1)) +
+  scale_y_continuous(breaks = seq(0, 600, 100)) +
+  labs(
+    title = "Histogram for BO uncertainty at 80% level",
+    x = "Uncertainty",
+    y = "Frequency"
+  )+
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    axis.text.x = element_text(size = 12),    # Adjust x-axis text size
+    axis.text.y = element_text(size = 12),    # Adjust y-axis text size
+    axis.title = element_text(size = 14)      # Adjust title size
+  )
+
+
+
+ggsave(hist_bioage_example80, 
+        filename = "Plots_Simulation/hist_bioage80.jpeg",
+        device = "jpeg",
+        height = 5, width = 7, units = "in")
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+
+
+
+
+
+
+
+parametros1 = c("beta0_y1",
+   "beta0_y4", 
+   "beta0_y5", 
+   "beta0_y6", 
+   "beta0_y10",
+   "beta0_y2", 
+   "beta0_y3", 
+   "beta0_y7", 
+   "beta0_y8",
+   "beta0_y9"
+   
+)
+
+
+
+
+
+
+parametros2 = c(
+   "beta1_y1", 
+   "beta1_y4", 
+   "beta1_y5", 
+   "beta1_y6", 
+   "beta1_y10",
+  "beta1_y2[2]",
+  "beta1_y2[3]",
+  "beta1_y3[2]",
+  "beta1_y3[3]",
+  "beta1_y7[2]",
+  "beta1_y7[3]",
+  "beta1_y8[2]",
+  "beta1_y8[3]",
+  "beta1_y9[2]",
+  "beta1_y9[3]"
+
+   
+)
+
+
+
+traceplot_params_beta0<-
+traceplot(fit,pars=parametros1,ncol=5)+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15),strip.text = element_text(size = 20))
+
+
+
+traceplot_params_beta1<-
+traceplot(fit,pars=parametros2,ncol=5)+ theme(text=element_text(size=15))+ theme(axis.text.x = element_text(angle=90))+ theme(legend.text=element_text(size=15),strip.text = element_text(size = 20))
+
+
+
+#Pegar en la consola 
+ggsave(traceplot_params_beta0, 
+        filename = "Plots_Simulation/traceplot_params_beta0.jpeg",
+        device = "jpeg",
+        height = 5, width = 18, units = "in")
+
+#Pegar en la consola 
+ggsave(traceplot_params_beta1, 
+        filename = "Plots_Simulation/traceplot_params_beta_1.jpeg",
+        device = "jpeg",
+        height = 7.5, width = 18, units = "in")
+```
+
+
+
+
+
+
+
+
 
 Plot of the coefficients B1
 
