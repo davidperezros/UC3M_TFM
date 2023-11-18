@@ -11,20 +11,23 @@ The repository is organized in different folders corresponding to the different 
 -   \~\\ **Theoretical_Example**: It contains all the files related to the simulated theoretical example. A *.rmd* with the corresponding code of the desired data simulation and the posterior analysis of the biological age, a *.RData* file containing the output.
 -   \~\\**Case Study**: It contains all files related to the main Case Study of the thesis. For privacy it doesn't contain the dataset used but just the code *rmd*, the output of the code and a folder containing the corresponding plots derived from the code which will be used for the thesis file.
 
+
 # Credits
 
-::: {key="value" style="gray"}
+```
 \@book{PerezRos-David2023,
 
     title        = {Estimation of Biological Age under a bayesian approach},
 
     author       = {P\\'erez-Ros, D.},
 
-    year         = {2023},
+    year         = {2024},
 
     note         = {Version 0.0.9. },
 
     url          = {<https://bookdown.org/egarpor/PM-UC3M/%7D>
 
 }
-:::
+```
+
+
