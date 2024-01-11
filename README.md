@@ -1,7 +1,7 @@
 # UC3M_TFM
 
 
-The aim of this repository is to host all the files related to the master thesis of David Pérez Ros, **Estimation of the Biological Age under a Bayesian Approach**. If you have any trouble running the R code, please contact us at the following email address: [davidperez202223\@gmail.com](mailto:davidperez202223@gmail.com){.email}
+The aim of this repository is to host all the files related to the master thesis of David Pérez Ros, **Estimation of the Biological Age under a Bayesian Approach**. If you have any trouble running the R code, please contact us at the following email address: [davidperez202223\@gmail.com](mailto:davidperez202223@gmail.com)
 
 # Structure
 
